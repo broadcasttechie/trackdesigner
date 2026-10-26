@@ -41,3 +41,9 @@ const start = a.byUid.get('p0').conns[0];
 const res = G.solveGap(r.end, start, { moves: G.solverMoves(defs, ['duplo-straight', 'duplo-curve']), maxDepth: 8, tol, budget: {}, loopJoints: 6, limit: 5 });
 assert.ok(res.results.length > 0 && res.results[0].steps.length === 6, 'solver closes a semicircle with 6 curves');
 console.log('geometry tests passed');
+
+const Sets = require('../public/sets.js');
+assert.ok(Sets.find('10872') && Sets.find(' 10872 '), 'set lookup trims input');
+assert.strictEqual(Sets.find('99999'), undefined, 'unknown set is not found');
+for (const s of Sets.SETS) for (const t of Object.keys(s.pieces)) assert.ok(defs[t], `set ${s.id} uses known piece ${t}`);
+console.log('set tests passed');

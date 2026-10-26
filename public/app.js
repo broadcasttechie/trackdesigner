@@ -93,7 +93,7 @@
   function freshWorkspace() {
     return {
       settings: { ...DEFAULT_SETTINGS },
-      lib: { custom: [], inventory: { ...DEFAULT_INV }, hidden: { ...DEFAULT_HIDDEN }, unlimited: false },
+      lib: { custom: [], inventory: { ...DEFAULT_INV }, hidden: { ...DEFAULT_HIDDEN }, unlimited: false, sets: [] },
       layout: { name: 'Example oval', pieces: [] },
     };
   }
@@ -829,6 +829,7 @@
       title: 'My pieces',
       html: `<p class="hint">Enter how many of each piece you own. The tray shows how many are left, and the status bar warns when a layout needs more than you have.</p>
         <label class="check"><input type="checkbox" id="unlimited" ${ws.lib.unlimited ? 'checked' : ''}> Ignore counts (plan with unlimited pieces)</label>
+        <div class="group"><h3>Add a set</h3>${setsHtml()}</div>
         <div class="list">${rows}</div>
         <div class="row"><button class="btn" type="button" id="toLibrary">Add a 3D-printed piece</button></div>`,
       mount(body) {
@@ -851,10 +852,52 @@
             changed({ keepSel: true }); renderPalette(); renderStatus();
           }
           if (e.target.id === 'toLibrary') openSheet('library');
+          if (e.target.id === 'addSet') {
+            const id = $('#set-id', body).value.trim(), qty = Math.max(1, parseInt($('#set-qty', body).value, 10) || 1);
+            const set = S.find(id);
+            if (!set) { $('#set-msg', body).textContent = `Set ${id || '?'} isn't in the catalogue yet. Enter its pieces by hand below.`; return; }
+            addSet(set, qty); openSheet('inventory');
+          }
+          const rm = e.target.closest('[data-rmset]');
+          if (rm) { removeSet(rm.dataset.rmset); openSheet('inventory'); }
         });
       },
     };
   };
+
+  /* ---------- sets ---------- */
+  const S = window.DuploSets;
+  function setsHtml() {
+    const have = ws.lib.sets.map((x) => {
+      const set = S.find(x.id);
+      return `<div class="list-row"><div></div><div class="info"><strong>${x.qty} × ${esc(x.id)} ${set ? esc(set.name) : ''}</strong>${set && set.extra ? `<span>${esc(set.extra)}</span>` : ''}</div>
+        <button class="btn small" type="button" data-rmset="${esc(x.id)}">Remove</button></div>`;
+    }).join('');
+    return `<p class="hint">Type a set number to add its track pieces to your counts. Known sets: ${S.SETS.map((s) => esc(s.id)).join(', ')}.</p>
+      <div class="row"><div class="field"><label for="set-id">Set number</label><input type="text" id="set-id" inputmode="numeric" list="set-list" placeholder="10872"></div>
+      <div class="field"><label for="set-qty">How many</label><input type="number" id="set-qty" min="1" value="1"></div>
+      <button class="btn primary" type="button" id="addSet">Add set</button></div>
+      <datalist id="set-list">${S.SETS.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</datalist>
+      <p class="hint" id="set-msg"></p>
+      ${have ? `<div class="list">${have}</div>` : ''}`;
+  }
+  function addSet(set, qty) {
+    for (const [t, n] of Object.entries(set.pieces)) {
+      ws.lib.inventory[t] = owned(t) + n * qty;
+      delete ws.lib.hidden[t];
+    }
+    const cur = ws.lib.sets.find((x) => x.id === set.id);
+    if (cur) cur.qty += qty; else ws.lib.sets.push({ id: set.id, qty });
+    changed({ keepSel: true }); renderPalette(); renderStatus();
+    toast(`Added ${qty} × ${set.id} ${set.name}`);
+  }
+  function removeSet(id) {
+    const set = S.find(id), cur = ws.lib.sets.find((x) => x.id === id);
+    if (!cur) return;
+    if (set) for (const [t, n] of Object.entries(set.pieces)) ws.lib.inventory[t] = Math.max(0, owned(t) - n * cur.qty);
+    ws.lib.sets = ws.lib.sets.filter((x) => x.id !== id);
+    changed({ keepSel: true }); renderPalette(); renderStatus();
+  }
 
   /* ---------- library ---------- */
   function geomSummary(def) {
@@ -1381,6 +1424,7 @@
         inventory: { ...base.lib.inventory, ...((w.lib && w.lib.inventory) || {}) },
         hidden: (w.lib && w.lib.hidden) || base.lib.hidden,
         unlimited: !!(w.lib && w.lib.unlimited),
+        sets: Array.isArray(w.lib && w.lib.sets) ? w.lib.sets : [],
       },
       layout: w.layout && Array.isArray(w.layout.pieces) ? w.layout : base.layout,
     };
