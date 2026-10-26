@@ -1,0 +1,13 @@
+services:
+  duplo-track-planner:
+    build: .
+    image: duplo-track-planner:latest
+    container_name: duplo-track-planner
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      # Optional login, e.g. "user:change-me". Leave empty for no login on your LAN.
+      BASIC_AUTH: ""

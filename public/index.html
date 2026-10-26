@@ -1,0 +1,59 @@
+<title>Duplo Track Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#E9EDE6">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-text">
+        <span class="brand-name">Duplo Track Planner</span>
+        <button class="layout-name" id="layoutNameBtn" type="button" title="Layouts">Untitled layout</button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="undoBtn" type="button" aria-label="Undo" title="Undo">
+        <svg viewBox="0 0 24 24"><path d="M9 7H4v5"/><path d="M4 12a8 8 0 1 0 2.3-5.6L4 9"/></svg>
+      </button>
+      <button class="icon-btn" id="redoBtn" type="button" aria-label="Redo" title="Redo">
+        <svg viewBox="0 0 24 24"><path d="M15 7h5v5"/><path d="M20 12a8 8 0 1 1-2.3-5.6L20 9"/></svg>
+      </button>
+      <button class="icon-btn" id="fitBtn" type="button" aria-label="Fit layout to screen" title="Fit to screen">
+        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="Menu" title="Menu">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <canvas id="cv" aria-label="Track layout canvas"></canvas>
+    <div class="scalebar" id="scalebar" aria-hidden="true"><span class="scalebar-bar"></span><span class="scalebar-label"></span></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </main>
+
+  <section class="dock" aria-label="Building tools">
+    <div class="status" id="status"></div>
+    <div class="selbar" id="selbar"></div>
+    <div class="palette" id="palette" role="toolbar" aria-label="Track pieces"></div>
+  </section>
+</div>
+
+<div class="sheet-backdrop" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Menu</h2>
+      <button class="icon-btn" id="sheetClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+</div>
+
+<script src="geometry.js"></script>
+<script src="app.js"></script>

@@ -1,0 +1,24 @@
+[Unit]
+Description=Duplo Track Planner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=duplo
+Group=duplo
+WorkingDirectory=/opt/duplo-track-planner
+Environment=PORT=8080
+Environment=HOST=0.0.0.0
+Environment=DATA_DIR=/var/lib/duplo-track-planner
+# Environment=BASIC_AUTH=user:change-me
+ExecStart=/usr/bin/node /opt/duplo-track-planner/server.js
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/duplo-track-planner
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
