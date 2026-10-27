@@ -21,13 +21,18 @@
     },
     {
       id: '10875', name: 'Cargo Train',
-      pieces: { 'duplo-curve': 14, 'duplo-straight': 2, 'duplo-crossing': 1, 'duplo-switch': 2, 'duplo-buffer': 2 },
-      extra: 'Not added: 1 rail with 8-module plate (6219503) and 2 inverted 16-module bow rails (6219647), which have no geometry yet.',
+      pieces: { 'duplo-curve': 14, 'duplo-straight': 2, 'duplo-crossing': 1, 'duplo-switch': 2, 'duplo-buffer': 2, 'duplo-plate-side': 1 },
+      extra: 'Not added: 2 inverted 16-module bow rails (6219647), which have no geometry yet.',
     },
     {
       id: '10426', name: 'Railway Bridge and Tracks',
-      pieces: { 'duplo-straight': 7, 'duplo-bridge': 1 },
-      extra: 'Counted as 7 straights plus 1 bridge, a guess from the set inventory. Not added: 1 crossing with 2×8 plates (6481090), which has no geometry yet.',
+      pieces: { 'duplo-straight': 7, 'duplo-bridge': 1, 'duplo-plate-both': 1 },
+      extra: 'Counted as 7 straights plus 1 bridge, a guess from the set inventory, plus 1 straight with two side plates (6481090).',
+    },
+    {
+      id: '10425', name: 'Train Tunnel and Tracks',
+      pieces: { 'duplo-curve': 10, 'duplo-switch': 1, 'duplo-buffer': 1, 'duplo-plate-both': 1 },
+      extra: 'Not added: 1 rail ramp, 6 module (6465960), whose length is unconfirmed, and the tunnel parts.',
     },
   ];
 
