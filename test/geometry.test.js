@@ -74,7 +74,7 @@ console.log('bridge tests passed');
 }
 console.log('bridge section tests passed');
 
-for (const id of ['duplo-plate-side', 'duplo-plate-both', 'duplo-ramp', 'duplo-crossing-90']) {
+for (const id of ['duplo-plate-side', 'duplo-plate-both', 'duplo-ramp', 'duplo-ramp-short', 'duplo-crossing-90']) {
   const d = G.BUILTIN.find((x) => x.id === id);
   assert.ok(d && G.compile(d).normal.conns.length >= 2, id + ' compiles with connectors');
 }

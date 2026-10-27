@@ -66,8 +66,8 @@
 
   /* ======================= state ======================= */
   const DEFAULT_SETTINGS = { gap: 4, lateral: 4, angle: 3, flex: 'sqrt', rotStep: 15, grid: true, overlaps: true, onlyOwned: true };
-  const DEFAULT_INV = { 'duplo-straight': 8, 'duplo-curve': 16, 'duplo-switch': 2, 'duplo-crossing': 0, 'duplo-buffer': 0, 'duplo-bridge': 0, 'duplo-level-crossing': 0, 'duplo-bridge-end': 0, 'duplo-bridge-arch': 0, 'duplo-plate-side': 0, 'duplo-plate-both': 0, 'duplo-ramp': 0, 'duplo-crossing-90': 0, 'duplo-curve-old': 0 };
-  const DEFAULT_HIDDEN = { 'duplo-curve-old': true, 'duplo-buffer': true, 'duplo-crossing': true, 'duplo-bridge': true, 'duplo-level-crossing': true, 'duplo-bridge-end': true, 'duplo-bridge-arch': true, 'duplo-plate-side': true, 'duplo-plate-both': true, 'duplo-ramp': true, 'duplo-crossing-90': true };
+  const DEFAULT_INV = { 'duplo-straight': 8, 'duplo-curve': 16, 'duplo-switch': 2, 'duplo-crossing': 0, 'duplo-buffer': 0, 'duplo-bridge': 0, 'duplo-level-crossing': 0, 'duplo-bridge-end': 0, 'duplo-bridge-arch': 0, 'duplo-plate-side': 0, 'duplo-plate-both': 0, 'duplo-ramp': 0, 'duplo-ramp-short': 0, 'duplo-crossing-90': 0, 'duplo-curve-old': 0 };
+  const DEFAULT_HIDDEN = { 'duplo-curve-old': true, 'duplo-buffer': true, 'duplo-crossing': true, 'duplo-bridge': true, 'duplo-level-crossing': true, 'duplo-bridge-end': true, 'duplo-bridge-arch': true, 'duplo-plate-side': true, 'duplo-plate-both': true, 'duplo-ramp': true, 'duplo-ramp-short': true, 'duplo-crossing-90': true };
 
   let ws = null;            // workspace: { settings, lib, layout }
   let sel = NONE;
@@ -896,6 +896,7 @@
             if (!set) { $('#set-msg', body).textContent = `Set ${id || '?'} isn't in the catalogue yet. Enter its pieces by hand below.`; return; }
             addSet(set, qty); openSheet('inventory');
           }
+          if (e.target.id === 'setsToCounts') { countsFromSets(); openSheet('inventory'); }
           const rm = e.target.closest('[data-rmset]');
           if (rm) { removeSet(rm.dataset.rmset); openSheet('inventory'); }
         });
@@ -917,7 +918,9 @@
       <button class="btn primary" type="button" id="addSet">Add set</button></div>
       <datalist id="set-list">${S.SETS.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</datalist>
       <p class="hint" id="set-msg"></p>
-      ${have ? `<div class="list">${have}</div>` : ''}`;
+      ${have ? `<div class="list">${have}</div>
+        <div class="row"><button class="btn" type="button" id="setsToCounts">Set my counts from these sets</button></div>
+        <p class="hint">Replaces the counts of the built-in pieces below with the totals from the sets above. Counts for your 3D-printed pieces are kept.</p>` : ''}`;
   }
   function addSet(set, qty) {
     for (const [t, n] of Object.entries(set.pieces)) {
@@ -928,6 +931,18 @@
     if (cur) cur.qty += qty; else ws.lib.sets.push({ id: set.id, qty });
     changed({ keepSel: true }); renderPalette(); renderStatus();
     toast(`Added ${qty} × ${set.id} ${set.name}`);
+  }
+  function countsFromSets() {
+    const before = { ...ws.lib.inventory };
+    const total = {};
+    for (const x of ws.lib.sets) {
+      const set = S.find(x.id);
+      if (set) for (const [t, n] of Object.entries(set.pieces)) total[t] = (total[t] || 0) + n * x.qty;
+    }
+    for (const d of G.BUILTIN) ws.lib.inventory[d.id] = total[d.id] || 0;
+    for (const t of Object.keys(total)) delete ws.lib.hidden[t];
+    changed({ keepSel: true }); renderPalette(); renderStatus();
+    toast('Counts set from your sets', { label: 'Undo', fn: () => { ws.lib.inventory = before; changed({ keepSel: true }); renderPalette(); renderStatus(); } });
   }
   function removeSet(id) {
     const set = S.find(id), cur = ws.lib.sets.find((x) => x.id === id);

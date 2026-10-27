@@ -275,6 +275,11 @@
       template: 'straight', params: { len: 256 }, ...T.straight(256),
     },
     {
+      id: 'duplo-ramp-short', name: 'Ramp (short)', part: '4785', builtin: true,
+      notes: 'Rail ramp, 6 module (2025). Modelled as a 96 mm straight from "6 module"; the length is an estimate and the rise is not drawn.',
+      template: 'straight', params: { len: 96 }, ...T.straight(96),
+    },
+    {
       id: 'duplo-crossing-90', name: 'Crossing 90°', part: '4646', builtin: true,
       notes: 'Black 1986–89 crossover at 90°. Arm length of 128 mm is assumed, not measured.',
       template: 'crossing', params: { len: 128, angle: 90 }, ...T.crossing(128, 90),

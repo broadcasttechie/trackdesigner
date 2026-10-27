@@ -11,8 +11,8 @@
   const SETS = [
     {
       id: '10872', name: 'Train Bridge and Tracks',
-      pieces: { 'duplo-straight': 7, 'duplo-bridge': 1 },
-      extra: 'Counted as 7 straights plus 1 bridge (built from the set\'s lower and upper bridge parts over one of its 8 straights). Adjust by hand if you build it differently.',
+      pieces: { 'duplo-straight': 8, 'duplo-bridge-end': 2, 'duplo-bridge-arch': 2 },
+      extra: 'The 2 lower bridge parts (35136) are bridge ends and the 2 upper parts (35138) are bridge arches. Their lengths are estimates.',
     },
     {
       id: '10882', name: 'Train Tracks',
@@ -26,13 +26,13 @@
     },
     {
       id: '10426', name: 'Railway Bridge and Tracks',
-      pieces: { 'duplo-straight': 7, 'duplo-bridge': 1, 'duplo-plate-both': 1 },
-      extra: 'Counted as 7 straights plus 1 bridge, a guess from the set inventory, plus 1 straight with two side plates (6481090).',
+      pieces: { 'duplo-straight': 8, 'duplo-bridge-end': 2, 'duplo-bridge-arch': 2, 'duplo-plate-both': 1 },
+      extra: 'The 2 lower bridge parts (5086) are bridge ends and the 2 upper parts (5087) are bridge arches, plus 1 straight with two side plates (6481090). Bridge lengths are estimates.',
     },
     {
       id: '10425', name: 'Train Tunnel and Tracks',
-      pieces: { 'duplo-curve': 10, 'duplo-switch': 1, 'duplo-buffer': 1, 'duplo-plate-both': 1 },
-      extra: 'Not added: 1 rail ramp, 6 module (6465960), whose length is unconfirmed, and the tunnel parts.',
+      pieces: { 'duplo-curve': 10, 'duplo-switch': 1, 'duplo-buffer': 1, 'duplo-plate-both': 1, 'duplo-ramp-short': 1 },
+      extra: 'The rail ramp, 6 module (6465960, design 4785) is modelled as a 96 mm straight; its length is an estimate. The tunnel is not track.',
     },
   ];
 
