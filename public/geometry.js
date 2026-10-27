@@ -310,6 +310,12 @@
         minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
         minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
       });
+      for (const [x0, y0, x1, y1] of def.decor || []) {
+        for (const [dx, dy] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) {
+          const p = toWorld(inst, { x: dx, y: dy });
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+        }
+      }
       byUid.set(inst.uid, { inst, def, variant: v, conns: world, samples, bbox: { minX, minY, maxX, maxY }, slack: +def.slack || 0 });
       world.forEach((c) => conns.push(c));
     });

@@ -1284,7 +1284,13 @@
     sel = NONE; changed(); fit(); update();
     return missing.length;
   }
-  function renderPNG() {
+  // Light palette for print, whatever theme the screen is in.
+  const PRINT_COLOURS = {
+    floor: '#FFFFFF', grid: 'transparent', gridMajor: 'transparent', panel: '#FBFCFA', ink: '#1C2620', muted: '#5A665E',
+    track: '#A9B0B5', edge: '#6E777D', rail: '#848C92', custom: '#E3873A', bridge: '#C9A24B', plate: '#D8CFAE', accent: '#1E5BB8',
+    accentSoft: 'rgba(30,91,184,0.12)', ok: '#2F8F57', warn: '#C98400', bad: '#CC2236', badSoft: 'rgba(204,34,54,0.14)',
+  };
+  function renderCanvas(light) {
     const b = layoutBounds(ws.layout.pieces);
     if (!b) return null;
     const w = b.maxX - b.minX, h = b.maxY - b.minY;
@@ -1292,10 +1298,73 @@
     const c = document.createElement('canvas');
     c.width = Math.ceil(w * s); c.height = Math.ceil(h * s);
     const x = c.getContext('2d');
-    x.fillStyle = C.floor; x.fillRect(0, 0, c.width, c.height);
-    x.setTransform(s, 0, 0, s, -b.minX * s, -b.minY * s);
-    drawLayout(x, s, an(), { export: true });
-    return c.toDataURL('image/png');
+    const saved = C;
+    if (light) C = PRINT_COLOURS;
+    try {
+      x.fillStyle = C.floor; x.fillRect(0, 0, c.width, c.height);
+      x.setTransform(s, 0, 0, s, -b.minX * s, -b.minY * s);
+      drawLayout(x, s, an(), { export: true });
+    } finally { C = saved; }
+    return { canvas: c, widthMm: w, heightMm: h };
+  }
+  function renderPNG() {
+    const r = renderCanvas(false);
+    return r && r.canvas.toDataURL('image/png');
+  }
+
+  /* Minimal PDF writer: one page with a JPEG of the layout, a title and a piece list.
+     Hand-rolled so the app stays dependency-free. */
+  function renderPDF() {
+    const r = renderCanvas(true);
+    if (!r) return null;
+    const jpeg = Uint8Array.from(atob(r.canvas.toDataURL('image/jpeg', 0.92).split(',')[1]), (ch) => ch.charCodeAt(0));
+    const landscape = r.widthMm >= r.heightMm;
+    const PW = landscape ? 841.89 : 595.28, PH = landscape ? 595.28 : 841.89, M = 36;
+    const used = usage();
+    const listText = Object.keys(used).map((t) => `${used[t]} x ${D()[t] ? D()[t].name : t}`).join(', ');
+    const total = ws.layout.pieces.length;
+    const pdfText = (s) => String(s).replace(/[()\\]/g, (m) => '\\' + m).replace(/[^\x20-\x7E]/g, '?');
+    const FS = 9, perLine = Math.floor((PW - 2 * M) / (FS * 0.5));
+    const lines = [];
+    for (let rest = `Pieces (${total}): ${listText}`; rest.length;) {
+      let cut = rest.length <= perLine ? rest.length : rest.lastIndexOf(' ', perLine);
+      if (cut <= 0) cut = Math.min(perLine, rest.length);
+      lines.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+    }
+    const footH = 24 + lines.length * (FS + 3);
+    const boxW = PW - 2 * M, boxH = PH - 2 * M - 30 - footH;
+    const k = Math.min(boxW / r.widthMm, boxH / r.heightMm);
+    const dw = r.widthMm * k, dh = r.heightMm * k;
+    const ix = (PW - dw) / 2, iy = M + footH + (boxH - dh) / 2;
+    const scale = Math.max(1, Math.round(r.widthMm / (dw * 25.4 / 72)));
+    const name = pdfText(ws.layout.name || 'Duplo layout');
+    let content = `BT /F1 16 Tf ${M} ${PH - M - 14} Td (${name}) Tj ET\n` +
+      `BT /F1 9 Tf ${M} ${PH - M - 28} Td (Scale about 1:${scale}  |  ${Math.round(r.widthMm)} x ${Math.round(r.heightMm)} mm  |  Duplo Track Planner) Tj ET\n` +
+      `q ${dw.toFixed(2)} 0 0 ${dh.toFixed(2)} ${ix.toFixed(2)} ${iy.toFixed(2)} cm /Im0 Do Q\n`;
+    lines.forEach((ln, i) => { content += `BT /F1 ${FS} Tf ${M} ${(M + footH - 14 - i * (FS + 3)).toFixed(1)} Td (${pdfText(ln)}) Tj ET\n`; });
+    const enc = new TextEncoder();
+    const chunks = [];
+    let len = 0;
+    const offsets = [];
+    const put = (d) => { const u = typeof d === 'string' ? enc.encode(d) : d; chunks.push(u); len += u.length; };
+    const obj = (n, body, stream) => {
+      offsets[n] = len;
+      put(`${n} 0 obj\n${body}\n`);
+      if (stream) { put('stream\n'); put(stream); put('\nendstream\n'); }
+      put('endobj\n');
+    };
+    put('%PDF-1.4\n');
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /Font << /F1 4 0 R >> /XObject << /Im0 5 0 R >> >> /Contents 6 0 R >>`);
+    obj(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    obj(5, `<< /Type /XObject /Subtype /Image /Width ${r.canvas.width} /Height ${r.canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>`, jpeg);
+    const cbytes = enc.encode(content);
+    obj(6, `<< /Length ${cbytes.length} >>`, cbytes);
+    const xref = len;
+    put(`xref\n0 7\n0000000000 65535 f \n${[1, 2, 3, 4, 5, 6].map((n) => String(offsets[n]).padStart(10, '0') + ' 00000 n \n').join('')}`);
+    put(`trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(chunks, { type: 'application/pdf' });
   }
   function download(name, href) {
     const a = document.createElement('a');
@@ -1312,7 +1381,7 @@
       <p class="storage-note">${Store.server ? 'Saved layouts live on <b>your server</b>.' : 'Saved layouts live in <b>this browser only</b>.'}</p>
       <div class="group"><h3>Saved layouts</h3><div class="list" id="ly-list"><div class="list-row"><div></div><div class="info"><span>Loading…</span></div><span></span></div></div></div>
       <div class="group"><h3>Share and back up</h3>
-        <div class="row">${framed ? '' : '<button class="btn" type="button" id="ly-json">Download file</button>'}<button class="btn" type="button" id="ly-copy">Copy as text</button><button class="btn" type="button" id="ly-png">Picture</button></div>
+        <div class="row">${framed ? '' : '<button class="btn" type="button" id="ly-json">Download file</button>'}<button class="btn" type="button" id="ly-copy">Copy as text</button><button class="btn" type="button" id="ly-png">Picture (PNG)</button><button class="btn" type="button" id="ly-pdf">PDF</button></div>
         <div id="ly-out"></div>
         <div class="field"><label for="ly-file">Open a layout file</label><input type="file" id="ly-file" accept="application/json,.json"></div>
         <div class="field"><label for="ly-paste">Or paste layout text</label><textarea id="ly-paste" placeholder='{"format":"duplo-track-planner", …}'></textarea></div>
@@ -1372,6 +1441,13 @@
         if (!url) { toast('Nothing to draw yet'); return; }
         $('#ly-out', body).innerHTML = `<p class="hint">Long-press or right-click the picture to save it.</p><img src="${url}" alt="Picture of ${esc(ws.layout.name)}" style="border-radius:12px;border:1px solid var(--line)">`;
         if (!framed) download(slug(ws.layout.name) + '.png', url);
+      };
+      $('#ly-pdf', body).onclick = () => {
+        const blob = renderPDF();
+        if (!blob) { toast('Nothing to draw yet'); return; }
+        const url = URL.createObjectURL(blob), file = slug(ws.layout.name) + '.pdf';
+        if (framed) $('#ly-out', body).innerHTML = `<p class="hint"><a href="${url}" target="_blank" rel="noopener">Open the PDF</a></p>`;
+        else { download(file, url); toast('PDF saved'); }
       };
       $('#ly-file', body).onchange = async (e) => {
         const f = e.target.files[0];
