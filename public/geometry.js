@@ -214,7 +214,7 @@
   const BUILTIN = [
     {
       id: 'duplo-straight', name: 'Straight', part: '6377', builtin: true,
-      notes: '8×4 studs, 128 mm. Same footprint as most straight specials (stop, level crossing 6391, plate 35965).',
+      notes: '8×4 studs, 128 mm. Same footprint as most straight specials (stop, plate 35965).',
       template: 'straight', params: { len: 128 }, ...T.straight(128),
     },
     {
@@ -241,6 +241,43 @@
       id: 'duplo-bridge', name: 'Bridge', part: 'bridge', builtin: true, bridge: true,
       notes: 'Raised straight, drawn as a 128 mm span. Length is assumed (no published size); it may cross over other track.',
       template: 'straight', params: { len: 128 }, ...T.straight(128),
+    },
+    {
+      id: 'duplo-level-crossing', name: 'Level crossing', part: '6391', builtin: true,
+      notes: 'Track with ramps for a car to cross; BrickLink lists it as 10×10 studs. Modelled as a 128 mm straight (an assumption: check it against a straight).',
+      template: 'straight', params: { len: 128 }, ...T.straight(128),
+    },
+    {
+      id: 'duplo-bridge-end', name: 'Bridge end', part: '6392 / 35136 / 5086', builtin: true,
+      notes: 'Bridge end section, 4 studs wide. Length 320 mm is estimated from BrickLink\'s 4×20 listing and package size, not measured. The ramp is drawn flat.',
+      template: 'straight', params: { len: 320 }, ...T.straight(320),
+    },
+    {
+      id: 'duplo-bridge-arch', name: 'Bridge arch', part: '6393 / 35138 / 5087', builtin: true, bridge: true,
+      notes: 'Bridge middle section (half arch); may cross over other track. Length 192 mm is estimated from package size, not measured.',
+      template: 'straight', params: { len: 192 }, ...T.straight(192),
+    },
+    {
+      id: 'duplo-plate-side', name: 'Straight + plate', part: '35965', builtin: true,
+      decor: [[0, 32, 128, 96]],
+      notes: 'Straight with a 4×8 plate along one side, so 8 studs square: the station platform. Rotate 180° for the other side. Track is a 128 mm straight.',
+      template: 'straight', params: { len: 128 }, ...T.straight(128),
+    },
+    {
+      id: 'duplo-plate-both', name: 'Straight + 2 plates', part: '5370', builtin: true,
+      decor: [[0, 32, 128, 64], [0, -64, 128, -32]],
+      notes: 'Straight with a 2×8 plate on each side (2025). Track is a 128 mm straight.',
+      template: 'straight', params: { len: 128 }, ...T.straight(128),
+    },
+    {
+      id: 'duplo-ramp', name: 'Ramp', part: '35966', builtin: true,
+      notes: 'Track ramp, 16×4 studs and 1.5 studs high per BrickLink. Modelled as a 256 mm straight; the rise is not drawn.',
+      template: 'straight', params: { len: 256 }, ...T.straight(256),
+    },
+    {
+      id: 'duplo-crossing-90', name: 'Crossing 90°', part: '4646', builtin: true,
+      notes: 'Black 1986–89 crossover at 90°. Arm length of 128 mm is assumed, not measured.',
+      template: 'crossing', params: { len: 128, angle: 90 }, ...T.crossing(128, 90),
     },
     {
       id: 'duplo-curve-old', name: 'Curve 30° (older)', part: '6378 dark grey', builtin: true,

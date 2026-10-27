@@ -66,8 +66,8 @@
 
   /* ======================= state ======================= */
   const DEFAULT_SETTINGS = { gap: 4, lateral: 4, angle: 3, flex: 'sqrt', rotStep: 15, grid: true, overlaps: true, onlyOwned: true };
-  const DEFAULT_INV = { 'duplo-straight': 8, 'duplo-curve': 16, 'duplo-switch': 2, 'duplo-crossing': 0, 'duplo-buffer': 0, 'duplo-bridge': 0, 'duplo-curve-old': 0 };
-  const DEFAULT_HIDDEN = { 'duplo-curve-old': true, 'duplo-buffer': true, 'duplo-crossing': true, 'duplo-bridge': true };
+  const DEFAULT_INV = { 'duplo-straight': 8, 'duplo-curve': 16, 'duplo-switch': 2, 'duplo-crossing': 0, 'duplo-buffer': 0, 'duplo-bridge': 0, 'duplo-level-crossing': 0, 'duplo-bridge-end': 0, 'duplo-bridge-arch': 0, 'duplo-plate-side': 0, 'duplo-plate-both': 0, 'duplo-ramp': 0, 'duplo-crossing-90': 0, 'duplo-curve-old': 0 };
+  const DEFAULT_HIDDEN = { 'duplo-curve-old': true, 'duplo-buffer': true, 'duplo-crossing': true, 'duplo-bridge': true, 'duplo-level-crossing': true, 'duplo-bridge-end': true, 'duplo-bridge-arch': true, 'duplo-plate-side': true, 'duplo-plate-both': true, 'duplo-ramp': true, 'duplo-crossing-90': true };
 
   let ws = null;            // workspace: { settings, lib, layout }
   let sel = NONE;
@@ -312,7 +312,7 @@
     const g = (n) => cs.getPropertyValue(n).trim();
     C = {
       floor: g('--floor'), grid: g('--grid'), gridMajor: g('--grid-major'), panel: g('--panel'), ink: g('--ink'), muted: g('--muted'),
-      track: g('--track'), edge: g('--track-edge'), rail: g('--rail'), custom: g('--custom'), bridge: g('--bridge'), accent: g('--accent'),
+      track: g('--track'), edge: g('--track-edge'), rail: g('--rail'), custom: g('--custom'), bridge: g('--bridge'), plate: g('--plate'), accent: g('--accent'),
       accentSoft: g('--accent-soft'), ok: g('--ok'), warn: g('--warn'), bad: g('--bad'), badSoft: g('--bad-soft'),
     };
   }
@@ -362,6 +362,11 @@
     for (const node of nodes) {
       const colour = node.def.bridge ? C.bridge : node.def.builtin ? C.track : (node.def.color || C.custom);
       c.lineCap = 'butt'; c.lineJoin = 'round';
+      for (const [x0, y0, x1, y1] of node.def.decor || []) {
+        const q = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => G.toWorld(node.inst, { x, y }));
+        c.fillStyle = C.plate; c.strokeStyle = C.edge; c.lineWidth = Math.max(2, 2 * px);
+        c.beginPath(); q.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y))); c.closePath(); c.fill(); c.stroke();
+      }
       if (node.def.bridge) { c.shadowColor = 'rgba(0,0,0,0.35)'; c.shadowBlur = 14 * Math.max(1, s); c.shadowOffsetY = 4 * Math.max(1, s); }
       c.strokeStyle = overTypes.has(node.inst.type) ? C.bad : C.edge;
       c.lineWidth = G.GAUGE_WIDTH + Math.max(2, 2.5 * px);
@@ -629,13 +634,15 @@
     opts = opts || {};
     const comp = G.compile(def);
     const v = mirror && !comp.symmetric ? comp.mirrored : comp.normal;
-    const pad = 40, b = v.bbox;
+    const pad = 40, b = { ...v.bbox };
+    for (const [x0, y0, x1, y1] of def.decor || []) { b.minX = Math.min(b.minX, x0); b.maxX = Math.max(b.maxX, x1); b.minY = Math.min(b.minY, y0); b.maxY = Math.max(b.maxY, y1); }
+    const decor = (def.decor || []).map(([x0, y0, x1, y1]) => `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" style="fill:var(--plate);stroke:var(--track-edge);stroke-width:4"/>`).join('');
     const vb = [b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2].map((n) => n.toFixed(1)).join(' ');
     const colour = def.bridge ? 'var(--bridge)' : def.builtin ? 'var(--track)' : esc(def.color || 'var(--custom)');
     const lines = v.samples.map((pts) => `<polyline points="${pts.map((p) => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}"/>`).join('');
     const conns = v.conns.map((c, i) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${opts.labels ? 16 : 11}" style="fill:var(--panel);stroke:var(--ink);stroke-width:5"/>` +
       (opts.labels ? `<text x="${c.x.toFixed(1)}" y="${(c.y + 7).toFixed(1)}" text-anchor="middle" style="fill:var(--ink);font:700 20px var(--font-data)">${i + 1}</text>` : '')).join('');
-    return `<svg viewBox="${vb}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><g fill="none" stroke-linejoin="round"><g style="stroke:var(--track-edge);stroke-width:68">${lines}</g><g style="stroke:${colour};stroke-width:62">${lines}</g></g>${conns}</svg>`;
+    return `<svg viewBox="${vb}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${decor}<g fill="none" stroke-linejoin="round"><g style="stroke:var(--track-edge);stroke-width:68">${lines}</g><g style="stroke:${colour};stroke-width:62">${lines}</g></g>${conns}</svg>`;
   }
 
   /* ======================= dock ======================= */

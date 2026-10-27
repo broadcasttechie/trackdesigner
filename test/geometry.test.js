@@ -63,3 +63,21 @@ console.log('set tests passed');
   assert.strictEqual(twoBridges.overlaps.length, 1, 'bridge over bridge overlaps');
 }
 console.log('bridge tests passed');
+
+{
+  const arch = G.BUILTIN.find((d) => d.id === 'duplo-bridge-arch'), end = G.BUILTIN.find((d) => d.id === 'duplo-bridge-end');
+  const d2 = { ...defs, [arch.id]: arch, [end.id]: end };
+  const cross = { uid: 'x', type: 'duplo-straight', x: 96, y: 0, rot: 0, mirror: false };
+  const over = (type) => G.analyse([cross, { uid: 'y', type, x: 192, y: -96, rot: 90, mirror: false }], d2, tol);
+  assert.strictEqual(over('duplo-bridge-arch').crossovers.length, 1, 'bridge arch crosses over track');
+  assert.strictEqual(over('duplo-bridge-end').overlaps.length, 1, 'bridge end is on the ground');
+}
+console.log('bridge section tests passed');
+
+for (const id of ['duplo-plate-side', 'duplo-plate-both', 'duplo-ramp', 'duplo-crossing-90']) {
+  const d = G.BUILTIN.find((x) => x.id === id);
+  assert.ok(d && G.compile(d).normal.conns.length >= 2, id + ' compiles with connectors');
+}
+const x90 = G.compile(G.BUILTIN.find((d) => d.id === 'duplo-crossing-90')).normal;
+assert.strictEqual(x90.conns.length, 4, '90° crossing has four ends');
+console.log('plate/ramp tests passed');

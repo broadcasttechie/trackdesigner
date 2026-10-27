@@ -13,6 +13,7 @@
   --rail: #848C92;
   --custom: #E3873A;         /* 3D-printed / custom pieces */
   --bridge: #C9A24B;         /* bridge spans */
+  --plate: #D8CFAE;          /* base plates beside track */
   --accent: #1E5BB8;         /* Duplo blue: selection and actions */
   --accent-ink: #FFFFFF;
   --accent-soft: rgba(30, 91, 184, 0.12);
@@ -30,7 +31,7 @@
   :root:not([data-theme="light"]) {
     --floor: #151A17; --grid: rgba(190, 215, 195, 0.05); --grid-major: rgba(190, 215, 195, 0.1);
     --panel: #1D2420; --panel-2: #242C27; --line: #343E38; --ink: #E5ECE6; --muted: #9BA79F;
-    --track: #7F888E; --track-edge: #C2CAD0; --rail: #5D666C; --custom: #E99A55; --bridge: #D4B05A;
+    --track: #7F888E; --track-edge: #C2CAD0; --rail: #5D666C; --custom: #E99A55; --bridge: #D4B05A; --plate: #8A8364;
     --accent: #6EA2F2; --accent-ink: #0D1A2E; --accent-soft: rgba(110, 162, 242, 0.16);
     --ok: #5CC489; --warn: #E8B33A; --bad: #FF6676; --bad-soft: rgba(255, 102, 118, 0.16);
     --shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
@@ -40,7 +41,7 @@
 :root[data-theme="dark"] {
   --floor: #151A17; --grid: rgba(190, 215, 195, 0.05); --grid-major: rgba(190, 215, 195, 0.1);
   --panel: #1D2420; --panel-2: #242C27; --line: #343E38; --ink: #E5ECE6; --muted: #9BA79F;
-  --track: #7F888E; --track-edge: #C2CAD0; --rail: #5D666C; --custom: #E99A55; --bridge: #D4B05A;
+  --track: #7F888E; --track-edge: #C2CAD0; --rail: #5D666C; --custom: #E99A55; --bridge: #D4B05A; --plate: #8A8364;
   --accent: #6EA2F2; --accent-ink: #0D1A2E; --accent-soft: rgba(110, 162, 242, 0.16);
   --ok: #5CC489; --warn: #E8B33A; --bad: #FF6676; --bad-soft: rgba(255, 102, 118, 0.16);
   --shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
