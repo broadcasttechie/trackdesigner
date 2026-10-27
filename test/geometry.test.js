@@ -47,3 +47,19 @@ assert.ok(Sets.find('10872') && Sets.find(' 10872 '), 'set lookup trims input');
 assert.strictEqual(Sets.find('99999'), undefined, 'unknown set is not found');
 for (const s of Sets.SETS) for (const t of Object.keys(s.pieces)) assert.ok(defs[t], `set ${s.id} uses known piece ${t}`);
 console.log('set tests passed');
+
+// Bridges may cross over other track, but not run along it or cross another bridge.
+{
+  const bd = { ...defs, 'duplo-bridge': G.BUILTIN.find((d) => d.id === 'duplo-bridge') };
+  const base = { uid: 'a', type: 'duplo-straight', x: 0, y: 0, rot: 0, mirror: false };
+  const at = (type, rot) => ({ uid: 'b', type, x: 64, y: 64, rot, mirror: false });
+  const run = (extra) => G.analyse([base, extra], bd, tol);
+  let res = run(at('duplo-bridge', -90));
+  assert.strictEqual(res.overlaps.length, 0, 'bridge crossing at 90° is not an overlap');
+  assert.strictEqual(res.crossovers.length, 1, 'bridge crossing is recorded as a crossover');
+  assert.strictEqual(run(at('duplo-straight', -90)).overlaps.length, 1, 'ordinary straight crossing still overlaps');
+  assert.strictEqual(run({ ...at('duplo-bridge', 0), y: 10 }).overlaps.length, 1, 'bridge lying along track overlaps');
+  const twoBridges = G.analyse([{ ...base, type: 'duplo-bridge' }, at('duplo-bridge', -90)], bd, tol);
+  assert.strictEqual(twoBridges.overlaps.length, 1, 'bridge over bridge overlaps');
+}
+console.log('bridge tests passed');

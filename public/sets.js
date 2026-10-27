@@ -2,7 +2,7 @@
  * Duplo set catalogue: which track pieces each set contains, as counts of
  * built-in piece ids. Counts come from Brickset set inventories (element
  * numbers 6207494 straight, 6207493 curve, 6207508 points, 6207496 crossing,
- * 6219464 rail stop). Parts the planner has no geometry for are listed in
+ * 6219464 rail stop). Bridges are modelled as a raised straight. Parts the planner has no geometry for are listed in
  * `extra` so the owner knows they were not added to the inventory.
  */
 (function (root) {
@@ -11,8 +11,8 @@
   const SETS = [
     {
       id: '10872', name: 'Train Bridge and Tracks',
-      pieces: { 'duplo-straight': 8 },
-      extra: 'Bridge parts (2 lower, 2 upper) are built over a straight and are not modelled.',
+      pieces: { 'duplo-straight': 7, 'duplo-bridge': 1 },
+      extra: 'Counted as 7 straights plus 1 bridge (built from the set\'s lower and upper bridge parts over one of its 8 straights). Adjust by hand if you build it differently.',
     },
     {
       id: '10882', name: 'Train Tracks',
@@ -26,8 +26,8 @@
     },
     {
       id: '10426', name: 'Railway Bridge and Tracks',
-      pieces: { 'duplo-straight': 8 },
-      extra: 'Not added: 1 crossing with 2×8 plates (6481090) and the bridge parts, which have no geometry yet.',
+      pieces: { 'duplo-straight': 7, 'duplo-bridge': 1 },
+      extra: 'Counted as 7 straights plus 1 bridge, a guess from the set inventory. Not added: 1 crossing with 2×8 plates (6481090), which has no geometry yet.',
     },
   ];
 

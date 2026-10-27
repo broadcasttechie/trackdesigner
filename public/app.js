@@ -66,8 +66,8 @@
 
   /* ======================= state ======================= */
   const DEFAULT_SETTINGS = { gap: 4, lateral: 4, angle: 3, flex: 'sqrt', rotStep: 15, grid: true, overlaps: true, onlyOwned: true };
-  const DEFAULT_INV = { 'duplo-straight': 8, 'duplo-curve': 16, 'duplo-switch': 2, 'duplo-crossing': 0, 'duplo-buffer': 0, 'duplo-curve-old': 0 };
-  const DEFAULT_HIDDEN = { 'duplo-curve-old': true, 'duplo-buffer': true, 'duplo-crossing': true };
+  const DEFAULT_INV = { 'duplo-straight': 8, 'duplo-curve': 16, 'duplo-switch': 2, 'duplo-crossing': 0, 'duplo-buffer': 0, 'duplo-bridge': 0, 'duplo-curve-old': 0 };
+  const DEFAULT_HIDDEN = { 'duplo-curve-old': true, 'duplo-buffer': true, 'duplo-crossing': true, 'duplo-bridge': true };
 
   let ws = null;            // workspace: { settings, lib, layout }
   let sel = NONE;
@@ -312,7 +312,7 @@
     const g = (n) => cs.getPropertyValue(n).trim();
     C = {
       floor: g('--floor'), grid: g('--grid'), gridMajor: g('--grid-major'), panel: g('--panel'), ink: g('--ink'), muted: g('--muted'),
-      track: g('--track'), edge: g('--track-edge'), rail: g('--rail'), custom: g('--custom'), accent: g('--accent'),
+      track: g('--track'), edge: g('--track-edge'), rail: g('--rail'), custom: g('--custom'), bridge: g('--bridge'), accent: g('--accent'),
       accentSoft: g('--accent-soft'), ok: g('--ok'), warn: g('--warn'), bad: g('--bad'), badSoft: g('--bad-soft'),
     };
   }
@@ -357,9 +357,12 @@
       }
       c.globalAlpha = 1;
     }
-    for (const node of A.byUid.values()) {
-      const colour = node.def.builtin ? C.track : (node.def.color || C.custom);
+    // bridges are drawn last, lifted by a shadow, so they read as passing over other track
+    const nodes = [...A.byUid.values()].sort((p, q) => (p.def.bridge ? 1 : 0) - (q.def.bridge ? 1 : 0));
+    for (const node of nodes) {
+      const colour = node.def.bridge ? C.bridge : node.def.builtin ? C.track : (node.def.color || C.custom);
       c.lineCap = 'butt'; c.lineJoin = 'round';
+      if (node.def.bridge) { c.shadowColor = 'rgba(0,0,0,0.35)'; c.shadowBlur = 14 * Math.max(1, s); c.shadowOffsetY = 4 * Math.max(1, s); }
       c.strokeStyle = overTypes.has(node.inst.type) ? C.bad : C.edge;
       c.lineWidth = G.GAUGE_WIDTH + Math.max(2, 2.5 * px);
       node.samples.forEach((pts) => { drawPolyline(c, pts); c.stroke(); });
@@ -370,6 +373,7 @@
         drawPolyline(c, offsetPts(pts, 20)); c.stroke();
         drawPolyline(c, offsetPts(pts, -20)); c.stroke();
       });
+      c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
       if (overlapUids.has(node.inst.uid)) {
         c.strokeStyle = C.badSoft; c.lineWidth = G.GAUGE_WIDTH;
         node.samples.forEach((pts) => { drawPolyline(c, pts); c.stroke(); });
@@ -627,7 +631,7 @@
     const v = mirror && !comp.symmetric ? comp.mirrored : comp.normal;
     const pad = 40, b = v.bbox;
     const vb = [b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2].map((n) => n.toFixed(1)).join(' ');
-    const colour = def.builtin ? 'var(--track)' : esc(def.color || 'var(--custom)');
+    const colour = def.bridge ? 'var(--bridge)' : def.builtin ? 'var(--track)' : esc(def.color || 'var(--custom)');
     const lines = v.samples.map((pts) => `<polyline points="${pts.map((p) => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}"/>`).join('');
     const conns = v.conns.map((c, i) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${opts.labels ? 16 : 11}" style="fill:var(--panel);stroke:var(--ink);stroke-width:5"/>` +
       (opts.labels ? `<text x="${c.x.toFixed(1)}" y="${(c.y + 7).toFixed(1)}" text-anchor="middle" style="fill:var(--ink);font:700 20px var(--font-data)">${i + 1}</text>` : '')).join('');

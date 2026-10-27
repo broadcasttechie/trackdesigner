@@ -23,6 +23,7 @@
   const DEG = Math.PI / 180;
   const STUD = 16;          // Duplo stud pitch in mm
   const GAUGE_WIDTH = 64;   // track sleeper width in mm (4 Duplo studs)
+  const BRIDGE_MIN_ANGLE = 30; // a bridge only clears track it crosses at least this steeply (degrees)
 
   const wrap = (a) => ((((a + 180) % 360) + 360) % 360) - 180; // to [-180, 180)
   const rad = (d) => d * DEG;
@@ -237,6 +238,11 @@
       template: 'buffer', params: { len: 148 }, ...T.buffer(148),
     },
     {
+      id: 'duplo-bridge', name: 'Bridge', part: 'bridge', builtin: true, bridge: true,
+      notes: 'Raised straight, drawn as a 128 mm span. Length is assumed (no published size); it may cross over other track.',
+      template: 'straight', params: { len: 128 }, ...T.straight(128),
+    },
+    {
       id: 'duplo-curve-old', name: 'Curve 30° (older)', part: '6378 dark grey', builtin: true,
       notes: 'Pre-2011 dark grey curves are slightly over-bent (≈30.3°, R≈256.6 mm), so a 12-piece circle overlaps a little.',
       template: 'curve', params: { r: 256.6, angle: 30.3 }, ...T.curve(256.6, 30.3),
@@ -343,6 +349,7 @@
 
     // Overlaps: centrelines of unjoined pieces closer than one track width.
     const overlaps = [];
+    const crossovers = [];
     if (tol.overlaps !== false) {
       const list = [...byUid.values()];
       const clear = GAUGE_WIDTH - 6;
@@ -354,22 +361,30 @@
           if ((adj.get(A.inst.uid) || new Set()).has(B.inst.uid)) continue;
           const nearJoint = A.conns.some((c) => c.mate && c.mate.uid === B.inst.uid);
           if (nearJoint) continue;
-          let hit = null;
+          let hit = null, angle = 0;
           outer: for (const pa of A.samples.flat()) {
             for (const pb of B.samples.flat()) {
               if (Math.abs(pa.x - pb.x) < clear && Math.abs(pa.y - pb.y) < clear && Math.hypot(pa.x - pb.x, pa.y - pb.y) < clear) {
                 hit = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+                angle = Math.abs(wrap(pa.h - pb.h));
+                angle = Math.min(angle, 180 - angle);
                 break outer;
               }
             }
           }
-          if (hit) overlaps.push({ a: A.inst.uid, b: B.inst.uid, at: hit });
+          if (!hit) continue;
+          // A bridge may pass over other track, but not run along it or over another bridge.
+          const bridges = (A.def.bridge ? 1 : 0) + (B.def.bridge ? 1 : 0);
+          if (bridges === 1 && angle >= BRIDGE_MIN_ANGLE) {
+            const over = A.def.bridge ? A : B, under = A.def.bridge ? B : A;
+            crossovers.push({ over: over.inst.uid, under: under.inst.uid, at: hit });
+          } else overlaps.push({ a: A.inst.uid, b: B.inst.uid, at: hit });
         }
       }
     }
 
     const open = conns.filter((c) => c.state === 'open' || c.state === 'miss');
-    return { byUid, conns, joints, overlaps, open, adj };
+    return { byUid, conns, joints, overlaps, crossovers, open, adj };
   }
 
   /* Pieces connected to uid through accepted joints. */
