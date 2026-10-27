@@ -16,13 +16,13 @@
     },
     {
       id: '10882', name: 'Train Tracks',
-      pieces: { 'duplo-curve': 10, 'duplo-straight': 1, 'duplo-crossing': 1, 'duplo-switch': 2, 'duplo-buffer': 2 },
-      extra: '',
+      pieces: { 'duplo-curve': 10, 'duplo-straight': 1, 'duplo-level-crossing': 1, 'duplo-switch': 2, 'duplo-buffer': 2 },
+      extra: 'The "crossing" (6207496) is design 6391, the level crossing with car ramps, not the X crossover.',
     },
     {
       id: '10875', name: 'Cargo Train',
-      pieces: { 'duplo-curve': 14, 'duplo-straight': 2, 'duplo-crossing': 1, 'duplo-switch': 2, 'duplo-buffer': 2, 'duplo-plate-side': 1 },
-      extra: 'Not added: 2 inverted 16-module bow rails (6219647), which have no geometry yet.',
+      pieces: { 'duplo-curve': 14, 'duplo-straight': 2, 'duplo-level-crossing': 1, 'duplo-switch': 2, 'duplo-buffer': 2, 'duplo-plate-side': 1, 'duplo-ramp': 2 },
+      extra: 'The "crossing" (6207496) is design 6391, the level crossing with car ramps. The 2 inverted 16-module bow rails (6219647) are design 35966, the ramp. The 5 coloured rail accessories are not track.',
     },
     {
       id: '10426', name: 'Railway Bridge and Tracks',

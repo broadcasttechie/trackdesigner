@@ -223,7 +223,7 @@
       template: 'curve', params: { r: 256, angle: 30 }, ...T.curve(256, 30),
     },
     {
-      id: 'duplo-switch', name: 'Switch', part: '6379 / 51943', builtin: true,
+      id: 'duplo-switch', name: 'Switch', part: '6379 / 51943 / 51560', builtin: true,
       notes: 'Y points: two 30° branches from a shared toe.',
       template: 'switchY', params: { r: 256, angle: 30 }, ...T.switchY(256, 30),
     },
@@ -233,7 +233,7 @@
       template: 'crossing', params: { len: 128, angle: 60 }, ...T.crossing(128, 60),
     },
     {
-      id: 'duplo-buffer', name: 'Track end', part: '31442', builtin: true,
+      id: 'duplo-buffer', name: 'Track end', part: '31442 / 35967', builtin: true,
       notes: 'Dead end with 2×4 plate. Length approximate.',
       template: 'buffer', params: { len: 148 }, ...T.buffer(148),
     },
