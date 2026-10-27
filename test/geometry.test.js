@@ -81,3 +81,35 @@ for (const id of ['duplo-plate-side', 'duplo-plate-both', 'duplo-ramp', 'duplo-c
 const x90 = G.compile(G.BUILTIN.find((d) => d.id === 'duplo-crossing-90')).normal;
 assert.strictEqual(x90.conns.length, 4, '90° crossing has four ends');
 console.log('plate/ramp tests passed');
+
+// Gap fixing: an oval with one straight swapped for a ramp (128 mm too long) cannot close;
+// swapping pieces in the loop should.
+{
+  const fdefs = { ...defs, 'duplo-ramp': G.BUILTIN.find((d) => d.id === 'duplo-ramp') };
+  const RAMP = ['duplo-ramp', false];
+  const r2 = (() => {
+    const pieces = [];
+    let end = { x: 0, y: 0, h: 0 };
+    [...Array(6).fill(C), S, RAMP, ...Array(6).fill(C), S, S].forEach(([type, mirror], i) => {
+      const comp = G.compile(fdefs[type]);
+      const v = mirror ? comp.mirrored : comp.normal;
+      const inst = { uid: 'p' + i, type, mirror, ...G.placeAgainst(v, 0, end) };
+      pieces.push(inst);
+      end = G.toWorld(inst, v.conns[v.next[0]]);
+    });
+    return pieces;
+  })();
+  const an0 = G.analyse(r2, fdefs, tol);
+  assert.ok(an0.open.length >= 2, 'ramp oval does not close');
+  const ends = an0.open;
+  const ea = ends[0], eb = ends[ends.length - 1];
+  const moves = G.solverMoves(fdefs, ['duplo-straight', 'duplo-curve', 'duplo-ramp']);
+  const res = G.suggestFixes(an0, ea, eb, { moves, tol, budget: {}, defs: fdefs, limit: 5, maxWindow: 3 });
+  assert.ok(res.results.length > 0, 'gap fixer finds a swap');
+  let n = 0;
+  const fixed = G.applyFix(r2, res.results[0], fdefs, () => 'n' + n++);
+  const an1 = G.analyse(fixed, fdefs, tol);
+  assert.strictEqual(an1.open.length, 0, 'applying the fix closes the loop');
+  assert.strictEqual(an1.overlaps.length, 0, 'fixed loop has no overlaps');
+}
+console.log('gap fix tests passed');

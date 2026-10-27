@@ -445,7 +445,7 @@
      Finds sequences of two-ended pieces that run from `from` (outward pose)
      to meet `to` (outward pose) within tolerance. */
   function solveGap(from, to, opts) {
-    const { moves, maxDepth, tol, budget, loopJoints, limit } = opts;
+    const { moves, maxDepth, tol, budget, loopJoints, limit, nodeCap, deadline } = opts;
     const target = { x: to.x, y: to.y, h: to.h };
     const maxStep = Math.max(...moves.map((m) => m.chord));
     const maxTurn = Math.max(...moves.map((m) => Math.abs(m.turn)));
@@ -453,7 +453,7 @@
     const seenSets = new Map();
     const seenSeq = new Set();
     let nodes = 0;
-    const NODE_CAP = 600000;
+    const NODE_CAP = nodeCap || 600000;
     const path = [];
     const left = { ...budget };
 
@@ -466,6 +466,7 @@
 
     function dfs(pose, depth, cap) {
       if (nodes++ > NODE_CAP || results.length >= limit * 4) return;
+      if (deadline && (nodes & 255) === 0 && Date.now() > deadline) { nodes = NODE_CAP + 1; return; }
       if (depth > 0) {
         const ok = fits(pose, depth);
         if (ok) {
@@ -509,6 +510,141 @@
     return { results: results.slice(0, limit), nodes, capped: nodes > NODE_CAP };
   }
 
+
+  /* ---------- gap fixing by swapping pieces ----------
+     The gap solver adds pieces between two open ends. This does the other
+     thing: it takes a short run of ordinary pieces out of the chain that joins
+     the two ends, then looks for a different run that lets the loop close.
+     Everything on the far side of the run is carried along rigidly. */
+  function pieceChain(an, from, to) {
+    const prev = new Map([[from, null]]);
+    let frontier = [from];
+    while (frontier.length && !prev.has(to)) {
+      const next = [];
+      for (const u of frontier) for (const v of an.adj.get(u) || []) if (!prev.has(v)) { prev.set(v, u); next.push(v); }
+      frontier = next;
+    }
+    if (!prev.has(to)) return null;
+    const out = [];
+    for (let u = to; u !== null; u = prev.get(u)) out.push(u);
+    return out.reverse();
+  }
+
+  function reachable(an, start, blocked) {
+    const seen = new Set([start]);
+    const stack = [start];
+    while (stack.length) {
+      const u = stack.pop();
+      for (const v of an.adj.get(u) || []) if (!blocked.has(v) && !seen.has(v)) { seen.add(v); stack.push(v); }
+    }
+    return seen;
+  }
+
+  const move = (p, c, q, phi) => {
+    const cs = Math.cos(rad(phi)), sn = Math.sin(rad(phi));
+    const dx = p.x - c.x, dy = p.y - c.y;
+    return { x: q.x + dx * cs - dy * sn, y: q.y + dx * sn + dy * cs };
+  };
+
+  /* Pure: the layout that results from applying a fix found by suggestFixes. */
+  function applyFix(pieces, fix, defs, newUid) {
+    const removed = new Set(fix.remove);
+    const down = new Set(fix.downstream);
+    let end = { x: fix.from.x, y: fix.from.y, h: fix.from.h };
+    const added = [];
+    for (const s of fix.steps) {
+      const comp = compile(defs[s.type]);
+      const v = s.mirror && !comp.symmetric ? comp.mirrored : comp.normal;
+      const inst = { uid: newUid(), type: s.type, mirror: !!(s.mirror && !comp.symmetric), entry: 0, ...placeAgainst(v, 0, end) };
+      added.push(inst);
+      end = toWorld(inst, v.conns[v.next[0]]);
+    }
+    const c = fix.joinAt;
+    const phi = wrap(end.h + 180 - c.h);
+    const out = pieces.filter((p) => !removed.has(p.uid)).map((p) => {
+      if (!down.has(p.uid)) return p;
+      const q = move(p, c, end, phi);
+      return { ...p, x: q.x, y: q.y, rot: wrap(p.rot + phi) };
+    });
+    return out.concat(added);
+  }
+
+  /* a, b: connectors from analyse().conns that should end up joined.
+     opts: { moves, tol, budget, maxWindow, maxExtra, limit, deadline, defs, newUid } */
+  function suggestFixes(an, a, b, opts) {
+    const { moves, tol, budget, defs, limit, deadline } = opts;
+    const maxWindow = opts.maxWindow || 4, maxExtra = opts.maxExtra === undefined ? 2 : opts.maxExtra;
+    const chain = pieceChain(an, a.uid, b.uid);
+    if (!chain || chain.length < 3) return { results: [], capped: false, tried: 0, noChain: !chain };
+
+    const joinOf = new Map();
+    for (const j of an.joints) {
+      if (j.kind === 'miss') continue;
+      joinOf.set(j.a.uid + '|' + j.b.uid, { [j.a.uid]: j.a, [j.b.uid]: j.b });
+      joinOf.set(j.b.uid + '|' + j.a.uid, { [j.a.uid]: j.a, [j.b.uid]: j.b });
+    }
+    const jointBetween = (p, q) => joinOf.get(p + '|' + q);
+    const eligible = (uid) => {
+      const n = an.byUid.get(uid);
+      return n && n.def.paths.length === 1 && n.variant.conns.length === 2;
+    };
+    const theta = wrap(a.h + 180 - b.h);
+    const m = chain.length;
+    const cands = [];
+    const keyOf = (inst) => inst.type + (inst.mirror ? 'L' : 'R');
+    let nodes = 0, capped = false, tried = 0;
+    const baseOpen = an.open.length, baseOverlaps = an.overlaps.length;
+    const pieces = [...an.byUid.values()].map((n) => n.inst);
+    let verified = 0;
+
+    outer:
+    for (let k = 1; k <= maxWindow; k++) {
+      for (let i = 1; i + k <= m - 1; i++) {
+        const j = i + k - 1;
+        const win = chain.slice(i, j + 1);
+        if (!win.every(eligible)) continue;
+        const up = chain[i - 1], dn = chain[j + 1];
+        const blocked = new Set(win);
+        const upSet = reachable(an, up, blocked);
+        if (upSet.has(b.uid) || !upSet.has(a.uid)) continue;
+        const dnSet = reachable(an, dn, blocked);
+        if (dnSet.has(a.uid) || !dnSet.has(b.uid)) continue;
+        const jf = jointBetween(up, win[0]), jt = jointBetween(win[win.length - 1], dn);
+        if (!jf || !jt) continue;
+        const from = jf[up], joinAt = jt[dn];
+        const to = (() => {
+          const p = move(joinAt, b, a, theta);
+          return { x: p.x, y: p.y, h: wrap(joinAt.h + theta) };
+        })();
+        const oldKeys = win.map((u) => keyOf(an.byUid.get(u).inst));
+        const bud = { ...budget };
+        for (const u of win) {
+          const t = an.byUid.get(u).inst.type;
+          if (bud[t] !== undefined) bud[t]++;
+        }
+        tried++;
+        const res = solveGap(from, to, { moves, maxDepth: k + maxExtra, tol, budget: bud, loopJoints: m - k, limit: 3, nodeCap: 40000, deadline });
+        if (res.capped) capped = true;
+        nodes += res.nodes;
+        for (const r of res.results) {
+          const keys = r.steps.map((s) => s.type + (s.mirror ? 'L' : 'R'));
+          if (keys.length === oldKeys.length && keys.every((x, n) => x === oldKeys[n])) continue;
+          const fix = { remove: win, steps: r.steps, from, joinAt, downstream: [...dnSet], window: [i, j] };
+          if (verified++ >= 60) continue;
+          const next = applyFix(pieces, fix, defs, (() => { let n = 0; return () => 'fx' + n++; })());
+          const na = analyse(next, defs, tol);
+          const ca = na.conns.find((c) => c.uid === a.uid && c.idx === a.idx);
+          if (!ca || !ca.mate || ca.mate.uid !== b.uid || (ca.state !== 'ok' && ca.state !== 'flex')) continue;
+          if (na.overlaps.length > baseOverlaps) continue;
+          cands.push({ ...fix, removedNames: oldKeys, k, err: r.err, score: r.score });
+        }
+        if (cands.length >= (limit || 8) * 3 || (deadline && Date.now() > deadline)) { capped = capped || (deadline && Date.now() > deadline); break outer; }
+      }
+    }
+    cands.sort((p, q) => p.k - q.k || Math.abs(p.steps.length - p.k) - Math.abs(q.steps.length - q.k) || p.score - q.score);
+    return { results: cands.slice(0, limit || 8), capped, tried, nodes, baseOpen };
+  }
+
   /* Moves for the solver: every two-ended, single-path piece, both hands. */
   function solverMoves(defs, typeIds) {
     const moves = [];
@@ -539,7 +675,7 @@
 
   const api = {
     STUD, GAUGE_WIDTH, wrap, advance, samplePath, mirrorDef, compile, toWorld, placeAgainst,
-    jointError, analyse, component, solveGap, solverMoves, flexFactor, TEMPLATES, BUILTIN, T,
+    jointError, analyse, component, solveGap, solverMoves, suggestFixes, applyFix, pieceChain, flexFactor, TEMPLATES, BUILTIN, T,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.DuploGeo = api;

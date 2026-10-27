@@ -310,6 +310,11 @@ button.chip { cursor: pointer; }
   font: 600 12px var(--font-data); padding: 2px 6px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line);
 }
 .solution .err { font: 12px var(--font-data); color: var(--muted); }
+.endtag { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--ink); color: var(--panel); font: 700 12px var(--font-data); }
+.solution[data-preview] { cursor: pointer; }
+.solution.previewing { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn) inset; }
+.solution .swap { display: flex; flex-direction: column; gap: 4px; }
+.solution .swap .lab { font: 700 11px var(--font-data); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .kbd { font-family: var(--font-data); font-size: 12px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel-2); }
 .storage-note { font-size: 13px; color: var(--muted); }
 .storage-note b { color: var(--ink); }

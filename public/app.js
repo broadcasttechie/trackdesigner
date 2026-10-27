@@ -157,6 +157,14 @@
   }
   const findInst = (u) => ws.layout.pieces.find((p) => p.uid === u);
   const isJoined = (c) => c && (c.state === 'ok' || c.state === 'flex');
+  // Open ends get letters (A, B, … Z, AA …) so they can be named in the gap tools.
+  const letterOf = (n) => { let s = ''; for (n += 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s; };
+  function endLetters(A) {
+    const m = new Map();
+    A.conns.filter((c) => !isJoined(c)).forEach((c, i) => m.set(c.uid + '#' + c.idx, letterOf(i)));
+    return m;
+  }
+  let fixPreview = null; // uids of pieces a suggested swap would replace
 
   /* ======================= editing ======================= */
   function handName(def, mirror) {
@@ -384,6 +392,11 @@
         node.samples.forEach((pts) => { drawPolyline(c, pts); c.stroke(); });
       }
     }
+    if (fixPreview && !opts.export) {
+      c.strokeStyle = C.warn; c.globalAlpha = 0.55; c.lineWidth = G.GAUGE_WIDTH + 14 * px; c.lineCap = 'round'; c.lineJoin = 'round';
+      for (const node of A.byUid.values()) if (fixPreview.has(node.inst.uid)) node.samples.forEach((pts) => { drawPolyline(c, pts); c.stroke(); });
+      c.globalAlpha = 1;
+    }
     // joints
     for (const j of A.joints) {
       const a = j.a, b = j.b;
@@ -476,6 +489,20 @@
       if (j.kind === 'miss') label(mid, `${fmt(j.e.dist)} mm · ${fmt(Math.abs(j.e.angle))}°`, C.panel, C.bad);
     }
     for (const o of A.overlaps) label(o.at, 'overlap', C.panel, C.bad);
+    const letters = endLetters(A);
+    ctx.font = '700 11px "JetBrains Mono", ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    for (const k of A.conns) {
+      if (isJoined(k)) continue;
+      const sp = toScreen(k);
+      const x = sp.x + Math.cos(k.h * Math.PI / 180) * 26, y = sp.y + Math.sin(k.h * Math.PI / 180) * 26;
+      const chosen = sel.kind === 'end' && sel.uid === k.uid && sel.idx === k.idx;
+      ctx.fillStyle = chosen ? C.accent : C.ink;
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = chosen ? '#fff' : C.panel;
+      ctx.fillText(letters.get(k.uid + '#' + k.idx) || '', x, y + 0.5);
+    }
+    ctx.textAlign = 'start';
     updateScalebar();
   }
 
@@ -704,7 +731,7 @@
         <button class="btn danger" type="button" data-act="del">${ICON.del}Delete</button>`;
     } else if (sel.kind === 'end') {
       el.innerHTML = `<span class="label"><strong>Building from this end.</strong> Tap a piece below.</span>
-        <button class="btn" type="button" data-act="solve">${ICON.gap}Close a gap</button>
+        <button class="btn" type="button" data-act="solve">${ICON.gap}Close or fix a gap</button>
         <button class="btn" type="button" data-act="clear">Done</button>`;
     } else {
       el.innerHTML = ws.layout.pieces.length
@@ -804,7 +831,7 @@
     sheet.dataset.name = name;
     if (r.mount) r.mount($('#sheetBody'));
   }
-  function closeSheet() { sheet.hidden = true; update(); }
+  function closeSheet() { sheet.hidden = true; fixPreview = null; update(); }
   $('#sheetClose').addEventListener('click', closeSheet);
   sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(); });
 
@@ -1174,11 +1201,13 @@
     }
     return Infinity;
   }
-  const solverState = { maxDepth: 10, types: null };
+  const solverState = { maxDepth: 10, types: null, mode: 'add' };
   SHEETS.solver = () => {
     const A = an();
     const node = A.byUid.get(sel.uid);
     const from = node.conns[sel.idx];
+    const L = endLetters(A);
+    const letter = (c) => L.get(c.uid + '#' + c.idx) || '?';
     const targets = A.conns.filter((c) => !isJoined(c) && !(c.uid === from.uid && c.idx === from.idx))
       .map((c) => ({ c, d: Math.hypot(c.x - from.x, c.y - from.y) })).sort((a, b) => a.d - b.d).slice(0, 8);
     const solvable = allTypes().filter((t) => {
@@ -1189,27 +1218,51 @@
     if (!targets.length) {
       return { title: 'Close a gap', html: '<p>There are no other open ends to join to. Add more track first, or start a second run of track to meet this one.</p>' };
     }
+    const MODES = {
+      add: { hint: 'Adds a run of new pieces between the two ends.', go: 'Find pieces to add' },
+      swap: { hint: 'Takes a few pieces out of the track that links the two ends and puts different ones in, so the loop closes without adding a gap piece. Everything beyond the swap shifts with it.', go: 'Find pieces to swap' },
+    };
     return {
-      title: 'Close a gap',
-      html: `<p class="hint">Finds runs of pieces from the selected end to another open end that fit within your tolerance.</p>
+      title: 'Close or fix a gap',
+      html: `<p class="hint">From end <span class="endtag">${letter(from)}</span>. Open ends are lettered on the plan.</p>
+        <div class="seg" role="group" aria-label="Method">
+          <button type="button" data-mode="add" aria-pressed="${solverState.mode === 'add'}">Add pieces</button>
+          <button type="button" data-mode="swap" aria-pressed="${solverState.mode === 'swap'}">Swap pieces</button>
+        </div>
+        <p class="hint" id="sv-hint">${MODES[solverState.mode].hint}</p>
         <div class="group"><h3>Join to</h3>
-          ${targets.map((t, i) => `<label class="check"><input type="radio" name="sv-target" value="${i}" ${i === 0 ? 'checked' : ''}> ${fmt(t.d / 10, 1)} cm away${t.c.uid === from.uid ? ' (same piece)' : ''}${t.c.state === 'miss' ? ' · currently a near miss' : ''}</label>`).join('')}
+          ${targets.map((t, i) => `<label class="check"><input type="radio" name="sv-target" value="${i}" ${i === 0 ? 'checked' : ''}> <span class="endtag">${letter(t.c)}</span> ${fmt(t.d / 10, 1)} cm away${t.c.uid === from.uid ? ' (same piece)' : ''}${t.c.state === 'miss' ? ' · currently a near miss' : ''}</label>`).join('')}
         </div>
         <div class="group"><h3>Use</h3>
           ${solvable.map((t) => `<label class="check"><input type="checkbox" data-sv-type="${esc(t)}" ${solverState.types.has(t) ? 'checked' : ''}> ${esc(D()[t].name)}</label>`).join('')}
           <label class="check"><input type="checkbox" id="sv-owned" ${ws.lib.unlimited ? '' : 'checked'}> Only pieces I still have</label>
         </div>
-        <div class="field"><label for="sv-depth">Most pieces to add: <span id="sv-depth-v">${solverState.maxDepth}</span></label>
+        <div class="field" id="sv-depth-wrap" ${solverState.mode === 'swap' ? 'hidden' : ''}><label for="sv-depth">Most pieces to add: <span id="sv-depth-v">${solverState.maxDepth}</span></label>
           <input type="range" id="sv-depth" min="2" max="14" value="${solverState.maxDepth}" style="accent-color:var(--accent)"></div>
-        <div class="row"><button class="btn primary" type="button" id="sv-go">Find ways to join</button></div>
+        <div class="row"><button class="btn primary" type="button" id="sv-go">${MODES[solverState.mode].go}</button></div>
         <div class="solutions" id="sv-results"></div>`,
       mount(body) {
+        const tokens = (list) => {
+          const runs = [];
+          list.forEach((n) => { const last = runs[runs.length - 1]; if (last && last.name === n) last.n++; else runs.push({ name: n, n: 1 }); });
+          return runs.map((x) => `<span class="tok">${esc(x.name)}${x.n > 1 ? ' ×' + x.n : ''}</span>`).join('');
+        };
         body.addEventListener('input', (e) => { if (e.target.id === 'sv-depth') { solverState.maxDepth = +e.target.value; $('#sv-depth-v', body).textContent = e.target.value; } });
         body.addEventListener('change', (e) => {
           const t = e.target.dataset.svType;
           if (t) { if (e.target.checked) solverState.types.add(t); else solverState.types.delete(t); }
         });
         let found = [];
+        $$('[data-mode]', body).forEach((b) => {
+          b.onclick = () => {
+            solverState.mode = b.dataset.mode;
+            $$('[data-mode]', body).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+            $('#sv-hint', body).textContent = MODES[solverState.mode].hint;
+            $('#sv-go', body).textContent = MODES[solverState.mode].go;
+            $('#sv-depth-wrap', body).hidden = solverState.mode === 'swap';
+            $('#sv-results', body).innerHTML = ''; fixPreview = null; render();
+          };
+        });
         $('#sv-go', body).onclick = () => {
           const target = targets[+(body.querySelector('[name="sv-target"]:checked') || { value: 0 }).value].c;
           const moves = G.solverMoves(D(), [...solverState.types]);
@@ -1221,28 +1274,54 @@
           const k = hops(A, from.uid, target.uid);
           const t = tol();
           if (!Number.isFinite(k)) t.flex = 'none';
+          fixPreview = null; render();
           $('#sv-results', body).innerHTML = '<p class="hint">Searching…</p>';
           setTimeout(() => {
+            if (solverState.mode === 'swap') {
+              const res = G.suggestFixes(A, from, target, { moves, tol: t, budget, defs: D(), limit: 8, maxWindow: 4, maxExtra: 2, deadline: Date.now() + 2500 });
+              found = res.results;
+              if (res.noChain) { $('#sv-results', body).innerHTML = `<p>Ends ${letter(from)} and ${letter(target)} aren't linked by a run of track, so there is nothing to swap. Use Add pieces instead.</p>`; return; }
+              if (!found.length) {
+                $('#sv-results', body).innerHTML = `<p>No swap of up to 4 pieces closes ${letter(from)} to ${letter(target)}${onlyOwned ? ' with the pieces you have' : ''}. Try more piece types, a looser tolerance, or Add pieces.</p>`;
+                return;
+              }
+              $('#sv-results', body).innerHTML = found.map((r, i) => `<div class="solution" data-preview="${i}"><div class="swap">
+                  <span class="lab">Take out</span><div class="seq">${tokens(r.remove.map((id) => { const p = findInst(id); return handName(D()[p.type], p.mirror); }))}</div>
+                  <span class="lab">Put in</span><div class="seq">${tokens(r.steps.map((s) => handName(D()[s.type], s.mirror)))}</div>
+                  <div class="err">${r.steps.length - r.remove.length === 0 ? 'same number of pieces' : (r.steps.length > r.remove.length ? '+' : '−') + Math.abs(r.steps.length - r.remove.length) + ' piece' + (Math.abs(r.steps.length - r.remove.length) > 1 ? 's' : '')} · ${r.downstream.length} piece${r.downstream.length === 1 ? '' : 's'} shift</div></div>
+                  <button class="btn small primary" type="button" data-use-fix="${i}">Use</button></div>`).join('')
+                + (res.capped ? '<p class="hint">Search stopped early. Fewer piece types gives a fuller search.</p>' : '');
+              return;
+            }
             const res = G.solveGap(from, target, { moves, maxDepth: solverState.maxDepth, tol: t, budget, loopJoints: Number.isFinite(k) ? k : 0, limit: 8 });
             found = res.results;
             if (!found.length) {
-              $('#sv-results', body).innerHTML = `<p>No run of up to ${solverState.maxDepth} pieces fits${onlyOwned ? ' with the pieces you have left' : ''}. Try more pieces, more piece types, a looser tolerance, or a 3D-printed adapter piece.</p>`;
+              $('#sv-results', body).innerHTML = `<p>No run of up to ${solverState.maxDepth} pieces fits${onlyOwned ? ' with the pieces you have left' : ''}. Try more pieces, more piece types, a looser tolerance, or Swap pieces.</p>`;
               return;
             }
-            $('#sv-results', body).innerHTML = found.map((r, i) => {
-              const runs = [];
-              r.steps.forEach((s) => {
-                const name = handName(D()[s.type], s.mirror);
-                const last = runs[runs.length - 1];
-                if (last && last.name === name) last.n++; else runs.push({ name, n: 1 });
-              });
-              return `<div class="solution"><div><div class="seq">${runs.map((x) => `<span class="tok">${esc(x.name)}${x.n > 1 ? ' ×' + x.n : ''}</span>`).join('')}</div>
+            $('#sv-results', body).innerHTML = found.map((r, i) => `<div class="solution"><div><div class="seq">${tokens(r.steps.map((s) => handName(D()[s.type], s.mirror)))}</div>
                 <div class="err">${r.steps.length} piece${r.steps.length > 1 ? 's' : ''} · closes to ${fmt(Math.abs(r.err.along))} mm along, ${fmt(Math.abs(r.err.lateral))} mm sideways, ${fmt(Math.abs(r.err.angle))}°</div></div>
-                <button class="btn small primary" type="button" data-use="${i}">Use</button></div>`;
-            }).join('') + (res.capped ? '<p class="hint">Search stopped early. Fewer piece types or a lower maximum gives a complete search.</p>' : '');
+                <button class="btn small primary" type="button" data-use="${i}">Use</button></div>`).join('')
+              + (res.capped ? '<p class="hint">Search stopped early. Fewer piece types or a lower maximum gives a complete search.</p>' : '');
           }, 30);
         };
         body.addEventListener('click', (e) => {
+          const pv = e.target.closest('[data-preview]');
+          const uf = e.target.closest('[data-use-fix]');
+          if (uf) {
+            const r = found[+uf.dataset.useFix];
+            pushUndo();
+            ws.layout.pieces = G.applyFix(ws.layout.pieces, r, D(), uid);
+            fixPreview = null; sel = NONE;
+            changed(); sheet.hidden = true; fit(); update();
+            toast(`Swapped ${r.remove.length} for ${r.steps.length} piece${r.steps.length === 1 ? '' : 's'}`, { label: 'Undo', fn: undo });
+            return;
+          }
+          if (pv) {
+            $$('.solution', body).forEach((x) => x.classList.toggle('previewing', x === pv));
+            fixPreview = new Set(found[+pv.dataset.preview].remove); render();
+            return;
+          }
           const b = e.target.closest('[data-use]');
           if (!b) return;
           const r = found[+b.dataset.use];
@@ -1373,6 +1452,30 @@
   // Inside an embedded preview, browsers block file downloads; offer copy/picture instead.
   const framed = (() => { try { return window.self !== window.top; } catch { return true; } })();
   const slug = (s) => (s || 'layout').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'layout';
+
+  async function shareImage() {
+    const r = renderCanvas(true);
+    if (!r) { toast('Nothing to draw yet'); return; }
+    const blob = await new Promise((res) => r.canvas.toBlob(res, 'image/png'));
+    const file = new File([blob], slug(ws.layout.name) + '.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: ws.layout.name || 'Duplo layout' }); }
+      catch (err) { if (err.name !== 'AbortError') toast('Could not share the picture'); }
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    if (framed) { window.open(url, '_blank'); return; }
+    download(file.name, url);
+    toast('Picture saved. Sharing isn\'t available in this browser.');
+  }
+  function printPDF() {
+    const blob = renderPDF();
+    if (!blob) { toast('Nothing to print yet'); return; }
+    const url = URL.createObjectURL(blob);
+    if (!window.open(url, '_blank')) download(slug(ws.layout.name) + '.pdf', url);
+  }
+  $('#shareBtn').addEventListener('click', shareImage);
+  $('#printBtn').addEventListener('click', printPDF);
 
   SHEETS.layouts = () => ({
     title: 'Layouts',
