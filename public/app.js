@@ -1252,6 +1252,25 @@
           const t = e.target.dataset.svType;
           if (t) { if (e.target.checked) solverState.types.add(t); else solverState.types.delete(t); }
         });
+        // A gap smaller than any piece can't be closed by adding pieces; say what it is and what would accept it.
+        const smallGap = (target) => {
+          const e = G.jointError(from, target);
+          if (e.dist > 64 || Math.abs(e.angle) > 15) return '';
+          const T = tol();
+          const score = Math.max(Math.abs(e.along) / T.gap, Math.abs(e.lateral) / T.lateral, Math.abs(e.angle) / T.angle);
+          const k = hops(A, from.uid, target.uid);
+          const joints = Number.isFinite(k) ? k + 1 : 1;
+          const generous = G.flexFactor('linear', joints);
+          const detail = `${fmt(e.dist)} mm (${fmt(Math.abs(e.along))} along, ${fmt(Math.abs(e.lateral))} sideways, ${fmt(Math.abs(e.angle))}°)`;
+          let advice;
+          if (ws.settings.flex !== 'linear' && score <= generous) {
+            advice = `Duplo track gives a little at every joint. With Generous loop flex this one counts as a fit.</p><div class="row"><button class="btn primary" type="button" data-accept="linear">Use Generous loop flex</button></div><p class="hint">`;
+          } else {
+            advice = 'It is outside what the loop flex allows, so loosen the fit tolerance in Menu → Fit tolerance if your pieces really do close it.';
+          }
+          return `<div class="solution" style="grid-template-columns:1fr"><div><strong>These ends are only ${detail} apart.</strong>
+            <p class="hint">No piece is that short, so adding or swapping pieces can't close it. ${advice}</p></div></div>`;
+        };
         let found = [];
         $$('[data-mode]', body).forEach((b) => {
           b.onclick = () => {
@@ -1275,17 +1294,19 @@
           const t = tol();
           if (!Number.isFinite(k)) t.flex = 'none';
           fixPreview = null; render();
-          $('#sv-results', body).innerHTML = '<p class="hint">Searching…</p>';
+          const small = smallGap(target);
+          $('#sv-results', body).innerHTML = small + '<p class="hint">Searching…</p>';
           setTimeout(() => {
             if (solverState.mode === 'swap') {
               const res = G.suggestFixes(A, from, target, { moves, tol: t, budget, defs: D(), limit: 8, maxWindow: 4, maxExtra: 2, deadline: Date.now() + 2500 });
               found = res.results;
-              if (res.noChain) { $('#sv-results', body).innerHTML = `<p>Ends ${letter(from)} and ${letter(target)} aren't linked by a run of track, so there is nothing to swap. Use Add pieces instead.</p>`; return; }
+              const keep = small;
+              if (res.noChain) { $('#sv-results', body).innerHTML = keep + `<p>Ends ${letter(from)} and ${letter(target)} aren't linked by a run of track, so there is nothing to swap. Use Add pieces instead.</p>`; return; }
               if (!found.length) {
-                $('#sv-results', body).innerHTML = `<p>No swap of up to 4 pieces closes ${letter(from)} to ${letter(target)}${onlyOwned ? ' with the pieces you have' : ''}. Try more piece types, a looser tolerance, or Add pieces.</p>`;
+                $('#sv-results', body).innerHTML = keep + `<p>No swap of up to 4 pieces closes ${letter(from)} to ${letter(target)}${onlyOwned ? ' with the pieces you have' : ''}. Try more piece types, a looser tolerance, or Add pieces.</p>`;
                 return;
               }
-              $('#sv-results', body).innerHTML = found.map((r, i) => `<div class="solution" data-preview="${i}"><div class="swap">
+              $('#sv-results', body).innerHTML = keep + found.map((r, i) => `<div class="solution" data-preview="${i}"><div class="swap">
                   <span class="lab">Take out</span><div class="seq">${tokens(r.remove.map((id) => { const p = findInst(id); return handName(D()[p.type], p.mirror); }))}</div>
                   <span class="lab">Put in</span><div class="seq">${tokens(r.steps.map((s) => handName(D()[s.type], s.mirror)))}</div>
                   <div class="err">${r.steps.length - r.remove.length === 0 ? 'same number of pieces' : (r.steps.length > r.remove.length ? '+' : '−') + Math.abs(r.steps.length - r.remove.length) + ' piece' + (Math.abs(r.steps.length - r.remove.length) > 1 ? 's' : '')} · ${r.downstream.length} piece${r.downstream.length === 1 ? '' : 's'} shift</div></div>
@@ -1296,16 +1317,23 @@
             const res = G.solveGap(from, target, { moves, maxDepth: solverState.maxDepth, tol: t, budget, loopJoints: Number.isFinite(k) ? k : 0, limit: 8 });
             found = res.results;
             if (!found.length) {
-              $('#sv-results', body).innerHTML = `<p>No run of up to ${solverState.maxDepth} pieces fits${onlyOwned ? ' with the pieces you have left' : ''}. Try more pieces, more piece types, a looser tolerance, or Swap pieces.</p>`;
+              $('#sv-results', body).innerHTML = small + `<p>No run of up to ${solverState.maxDepth} pieces fits${onlyOwned ? ' with the pieces you have left' : ''}. Try more pieces, more piece types, a looser tolerance, or Swap pieces.</p>`;
               return;
             }
-            $('#sv-results', body).innerHTML = found.map((r, i) => `<div class="solution"><div><div class="seq">${tokens(r.steps.map((s) => handName(D()[s.type], s.mirror)))}</div>
+            $('#sv-results', body).innerHTML = small + found.map((r, i) => `<div class="solution"><div><div class="seq">${tokens(r.steps.map((s) => handName(D()[s.type], s.mirror)))}</div>
                 <div class="err">${r.steps.length} piece${r.steps.length > 1 ? 's' : ''} · closes to ${fmt(Math.abs(r.err.along))} mm along, ${fmt(Math.abs(r.err.lateral))} mm sideways, ${fmt(Math.abs(r.err.angle))}°</div></div>
                 <button class="btn small primary" type="button" data-use="${i}">Use</button></div>`).join('')
               + (res.capped ? '<p class="hint">Search stopped early. Fewer piece types or a lower maximum gives a complete search.</p>' : '');
           }, 30);
         };
         body.addEventListener('click', (e) => {
+          const ac = e.target.closest('[data-accept]');
+          if (ac) {
+            ws.settings.flex = ac.dataset.accept;
+            changed({ keepSel: true }); sheet.hidden = true; update();
+            toast('Loop flex set to Generous', { label: 'Undo', fn: () => { ws.settings.flex = 'sqrt'; changed({ keepSel: true }); update(); } });
+            return;
+          }
           const pv = e.target.closest('[data-preview]');
           const uf = e.target.closest('[data-use-fix]');
           if (uf) {

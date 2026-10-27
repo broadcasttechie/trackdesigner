@@ -274,7 +274,7 @@ button.chip { cursor: pointer; }
 .slider-row input[type="number"] { min-height: 36px; text-align: right; font-family: var(--font-data); }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); margin: 1px 0 0; flex: none; }
-.seg { align-self: flex-start; display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex-wrap: wrap; }
+.seg { flex: none; align-self: flex-start; display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex-wrap: wrap; }
 .seg button { border: 0; background: var(--panel-2); padding: 8px 12px; font-size: 13px; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 
